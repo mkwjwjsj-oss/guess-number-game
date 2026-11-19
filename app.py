@@ -1,5 +1,7 @@
+
 import os
 import random
+import logging
 import telebot
 from flask import Flask, request, abort
 
@@ -9,11 +11,19 @@ URL = os.environ["RENDER_EXTERNAL_URL"].rstrip("/")
 
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
+
+logging.basicConfig(level=logging.INFO)
+
 games = {}
+
 
 @bot.message_handler(commands=["start"])
 def start(message):
-    bot.reply_to(message, "أهلاً بك 🎮\nاكتب /game لبدء لعبة خمن الرقم من 1 إلى 50!")
+    bot.reply_to(
+        message,
+        "أهلاً بك 🎮\nاكتب /game لبدء لعبة تخمين الرقم!"
+    )
+
 
 @bot.message_handler(commands=["game"])
 def game(message):
@@ -21,7 +31,13 @@ def game(message):
         "number": random.randint(1, 50),
         "attempts": 0
     }
-    bot.reply_to(message, "🎯 اخترت رقماً من 1 إلى 50!\nخمن باستخدام /guess 25")
+
+    bot.reply_to(
+        message,
+        "🎯 اخترت رقماً من 1 إلى 50!\n"
+        "خمن باستخدام الأمر:\n/guess 25"
+    )
+
 
 @bot.message_handler(commands=["guess"])
 def guess(message):
@@ -52,32 +68,42 @@ def guess(message):
 
     if number < answer:
         bot.reply_to(message, "⬆️ الرقم أكبر!")
+
     elif number > answer:
         bot.reply_to(message, "⬇️ الرقم أصغر!")
+
     else:
         attempts = games[uid]["attempts"]
         del games[uid]
-        bot.reply_to(message, f"🎉 صحيح! الرقم {answer}\nمحاولاتك: {attempts}")
+
+        bot.reply_to(
+            message,
+            f"🎉 صحيح! الرقم {answer}\nمحاولاتك: {attempts}"
+        )
+
 
 @bot.message_handler(commands=["stopgame"])
 def stopgame(message):
     games.pop(message.from_user.id, None)
     bot.reply_to(message, "تم إيقاف اللعبة.")
 
+
 @app.get("/")
 def home():
     return "Guess Number Bot is running!", 200
 
 
-def webhook():@app.post("/telegram")
+@app.post("/telegram")
 def webhook():
     try:
-        if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != SECRET:
+        if request.headers.get(
+            "X-Telegram-Bot-Api-Secret-Token"
+        ) != SECRET:
             app.logger.error("Webhook secret mismatch")
             abort(403)
 
         data = request.get_json(force=True)
-        app.logger.info("Telegram update received: %s", data)
+        app.logger.info("Telegram update received")
 
         update = telebot.types.Update.de_json(data)
         bot.process_new_updates([update])
@@ -87,12 +113,7 @@ def webhook():
     except Exception:
         app.logger.exception("Webhook processing failed")
         return "ERROR", 500
-    if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != SECRET:
-        abort(403)
 
-    update = telebot.types.Update.de_json(request.get_json(force=True))
-    bot.process_new_updates([update])
-    return "OK", 200
 
 bot.remove_webhook()
 bot.set_webhook(
