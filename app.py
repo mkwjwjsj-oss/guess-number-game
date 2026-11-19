@@ -68,8 +68,25 @@ def stopgame(message):
 def home():
     return "Guess Number Bot is running!", 200
 
-@app.post("/telegram")
+
+def webhook():@app.post("/telegram")
 def webhook():
+    try:
+        if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != SECRET:
+            app.logger.error("Webhook secret mismatch")
+            abort(403)
+
+        data = request.get_json(force=True)
+        app.logger.info("Telegram update received: %s", data)
+
+        update = telebot.types.Update.de_json(data)
+        bot.process_new_updates([update])
+
+        return "OK", 200
+
+    except Exception:
+        app.logger.exception("Webhook processing failed")
+        return "ERROR", 500
     if request.headers.get("X-Telegram-Bot-Api-Secret-Token") != SECRET:
         abort(403)
 
